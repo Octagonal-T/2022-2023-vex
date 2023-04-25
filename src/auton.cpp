@@ -48,7 +48,7 @@ int drivePID(){
     if(fabs(rotationPID.error) > 180) rotationPID.error = currentHeading - rotationPID.target;
     if(fabs(rotationPID.error) > 180) rotationPID.error = -360+rotationPID.target - currentHeading;
     
-    if((fabs(lateralPID.error) > 20 && engageLateral) || (fabs(rotationPID.error) > 2 && engageRotational)){
+    if((fabs(lateralPID.error) > 35 && engageLateral) || (fabs(rotationPID.error) > 3 && engageRotational)){
       confirmSeconds=0;
       movementFinished = false;
       lateralPID.derivative = lateralPID.error - lateralPID.lastError;
@@ -104,7 +104,7 @@ int drivePID(){
       rotationPID.lastError = rotationPID.error;
     }else{
       confirmSeconds++;
-      if(confirmSeconds==25){
+      if(confirmSeconds==15){
         confirmSeconds = 0;
         movementFinished = true;
         Encoder.resetRotation();
@@ -136,11 +136,11 @@ void preAuton(){
   Controller.Screen.newLine();
   lateralPID.kP = 0.05;
   lateralPID.kI = 0;
-  lateralPID.kD = 0;
+  lateralPID.kD = 0.005;
 
-  rotationPID.kP = 0.3;
+  rotationPID.kP = 0.4;
   // rotationPID.kI = 0.01;
-  rotationPID.kD = 0.095;
+  rotationPID.kD = 0.098;
 
   movementFinished = true;
   confirmSeconds = 0;
@@ -204,14 +204,33 @@ void startAutonomous(){
   if(routine == 1){ // left
     
   }else if(routine == 2){ // right
-
+    driveTo(20, 0);
+    waitUntil(movementFinished);
+    driveTo(0, 90);
+    waitUntil(movementFinished);
+    Intake.spin(vex::reverse, 100, vex::percent);
+    LeftMotors.spin(vex::reverse);
+    RightMotors.spin(vex::reverse);
+    vex::task::sleep(300);
+    LeftMotors.stop();
+    RightMotors.stop();
+    Intake.stop();
+    driveTo(-5, 0);
+    waitUntil(movementFinished);
+    Flywheel.spin(vex::forward, 11, vex::volt);
+    driveTo(0, 98);
+    waitUntil(movementFinished);
+    vex::task::sleep(500);
+    toggleIndexer();
+    vex::task::sleep(1500);
+    toggleIndexer();
   }else if(routine == 3){ // test
     driveTo(100, 0);
     waitUntil(movementFinished);
     driveTo(0, 180);
     waitUntil(movementFinished);
     driveTo(100, 0);
-    waitUntil(movementFinished);
   }
+  waitUntil(movementFinished);
   autoEngaged = false;
 }
