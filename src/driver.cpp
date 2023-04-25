@@ -19,15 +19,15 @@ int updateControllerScreen(){
   while(driverControl){
     Controller.Screen.clearScreen();
     Controller.Screen.setCursor(1,1);
-    Controller.Screen.print("Flywheel: %fV, %fW", floor(Flywheel.voltage(vex::volt)), floor(Flywheel.power(vex::watt)));
+    Controller.Screen.print("Flywheel: %dV, %dW", floor(Flywheel.voltage(vex::volt)), floor(Flywheel.power(vex::watt)));
     Controller.Screen.newLine();
-    Controller.Screen.print("Intake: %fV, %fW", floor(Intake.voltage(vex::volt)), floor(Intake.power(vex::watt)));
+    Controller.Screen.print("Intake: %dV, %dW", floor(Intake.voltage(vex::volt)), floor(Intake.power(vex::watt)));
     Controller.Screen.newLine();
     int seconds = floor(expansionSeconds / 50);
     int mins = floor(seconds / 60);
     seconds = seconds - (mins*60);
     Controller.Screen.newLine();
-    Controller.Screen.print("Game time: %f:%f", mins, seconds);
+    Controller.Screen.print("Game time: %d:%d", mins, seconds);
     vex::task::sleep(250);
   }
   return 1;
