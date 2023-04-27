@@ -46,7 +46,7 @@ int drivePID(){
     rotationPID.error = rotationPID.target - currentHeading;
 
     if(fabs(rotationPID.error) > 180) rotationPID.error = currentHeading - rotationPID.target;
-    if(fabs(rotationPID.error) > 180) rotationPID.error = -360+rotationPID.target - currentHeading;
+    if(fabs(rotationPID.error) > 180) rotationPID.error = currentHeading +360-rotationPID.target;
     
     if((fabs(lateralPID.error) > 35 && engageLateral) || (fabs(rotationPID.error) > 3 && engageRotational)){
       confirmSeconds=0;
@@ -131,10 +131,11 @@ void preAuton(){
     vex::task::sleep(100);
   }
   Encoder.resetRotation();
+  Inertial.resetHeading();
   Controller.Screen.newLine();
   Controller.Screen.print("Finished calibrating");
   Controller.Screen.newLine();
-  lateralPID.kP = 0.05;
+  lateralPID.kP = 0.06;
   lateralPID.kI = 0;
   lateralPID.kD = 0.005;
 
@@ -217,10 +218,10 @@ void startAutonomous(){
     Intake.stop();
     driveTo(-5, 0);
     waitUntil(movementFinished);
-    Flywheel.spin(vex::forward, 11, vex::volt);
-    driveTo(0, 98);
+    Flywheel.spin(vex::forward, 11.5, vex::volt);
+    driveTo(0, 99);
     waitUntil(movementFinished);
-    vex::task::sleep(500);
+    vex::task::sleep(750);
     toggleIndexer();
     vex::task::sleep(1500);
     toggleIndexer();
@@ -230,7 +231,8 @@ void startAutonomous(){
     driveTo(0, 180);
     waitUntil(movementFinished);
     driveTo(100, 0);
-  }
   waitUntil(movementFinished);
+
+  }
   autoEngaged = false;
 }
