@@ -8,7 +8,6 @@
 #include <constants.h>
 #include <subtasks.h>
 
-
 bool leftMotorMoving = true;
 bool rightMotorMoving = true;
 bool previousIntakeCommand = false;
