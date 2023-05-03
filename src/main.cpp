@@ -19,7 +19,6 @@
 int main() {
   preAuton();
   // startAutonomous();
-  // drivercontrol();
   Competition.autonomous(startAutonomous);
   Competition.drivercontrol(drivercontrol);
 }

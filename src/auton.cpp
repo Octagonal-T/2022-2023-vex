@@ -20,6 +20,7 @@ int confirmSeconds;
 int maxLeft = 100;
 int maxRight = 100;
 int directional = -1;
+int increment = 0;
 
 void driveTo(double lateral, double heading, int maxLeft2=100, int maxRight2=100, int directional2=-1){
   lateralPID.target = (lateral/7.06858347)*360;
@@ -54,7 +55,6 @@ int drivePID(){
     if((fabs(lateralPID.error) > 35 && engageLateral) || (fabs(rotationPID.error) > 2 && engageRotational)){
       if(confirmSeconds > 0){
         confirmSeconds=0;
-        directional = -1;
       }
       movementFinished = false;
       lateralPID.derivative = lateralPID.error - lateralPID.lastError;
@@ -67,13 +67,16 @@ int drivePID(){
       double leftMotorsVelocity;
       double rightMotorsVelocity;
       if(engageRotational){
+        if(increment == 5){
+          directional = -1;
+        }
         Controller.Screen.clearScreen();
         Controller.Screen.setCursor(1,1);
         Controller.Screen.print(currentHeading);
         Controller.Screen.newLine();
         Controller.Screen.print(rotationPID.target);
         Controller.Screen.newLine();
-        Controller.Screen.print(rotationPID.error);
+        Controller.Screen.print(turnVelocity);
         if(directional == -1){
           if(rotationPID.error > 0){
             leftMotorsVelocity = -turnVelocity;
@@ -86,7 +89,7 @@ int drivePID(){
           if(directional == 0){
             leftMotorsVelocity = -turnVelocity;
             rightMotorsVelocity = turnVelocity;
-          }else{
+          }else if(directional == 1){
             leftMotorsVelocity = turnVelocity;
             rightMotorsVelocity = -turnVelocity;
           }
@@ -101,25 +104,27 @@ int drivePID(){
         Controller.Screen.print(lateralPID.error);
         leftMotorsVelocity = (lateralVelocity);
         rightMotorsVelocity = (lateralVelocity);
+        
+        if(leftMotorsVelocity > maxLeft) leftMotorsVelocity = maxLeft;
+        else if(leftMotorsVelocity < -maxLeft) leftMotorsVelocity = -maxLeft;
+        if(rightMotorsVelocity > maxRight) rightMotorsVelocity = maxRight;
+        else if(rightMotorsVelocity < -maxRight) leftMotorsVelocity = -maxRight;
       }
-
-      if(leftMotorsVelocity > maxLeft) leftMotorsVelocity = maxLeft;
-      else if(leftMotorsVelocity < -maxLeft) leftMotorsVelocity = -maxLeft;
-      if(rightMotorsVelocity > maxRight) rightMotorsVelocity = maxRight;
-      else if(rightMotorsVelocity < -maxRight) leftMotorsVelocity = -maxRight;
-
       LeftMotors.spin(vex::forward, leftMotorsVelocity, vex::percent);
       RightMotors.spin(vex::forward, rightMotorsVelocity, vex::percent);
 
       lateralPID.lastError = lateralPID.error;
       rotationPID.lastError = rotationPID.error;
+      increment++;
     }else{
+      directional = -1;
       confirmSeconds++;
       if(confirmSeconds==15){
         confirmSeconds = 0;
         movementFinished = true;
         Encoder.resetRotation();
         lateralPID.target = 0;
+        rotationPID.target = 0;
         lateralPID.lastError = 0;
         rotationPID.lastError = 0;
         engageLateral = false;
@@ -128,11 +133,48 @@ int drivePID(){
         RightMotors.stop();
         maxLeft = 100;
         maxRight = 100;
+        increment = 0;
       }
     }
     vex::task::sleep(20);
   }
   return 1;
+}
+bool rotationComplete = true;
+void rotateTo(double targetHeading, double velocity=10){ // rotate to a absolute heading relative to the robot's initial starting position
+  rotationComplete = false;
+  int currentHeading = Inertial.heading();
+  int relativeTurnAngle = targetHeading - currentHeading; // negative = turn left, positive = turn right
+  if(relativeTurnAngle > 180 || relativeTurnAngle < -180){
+    relativeTurnAngle = currentHeading - targetHeading;
+  }
+  if(relativeTurnAngle > 0){
+    LeftMotors.setVelocity(-(velocity), vex::percent);
+    RightMotors.setVelocity(velocity, vex::percent);
+  }else{
+    LeftMotors.setVelocity(velocity, vex::percent);
+    RightMotors.setVelocity(-(velocity), vex::percent);
+  }
+  LeftMotors.spin(vex::forward);
+  RightMotors.spin(vex::forward);
+  do{
+    currentHeading = Inertial.heading();
+    // wait(5, msec);
+  }while(
+    (currentHeading > (targetHeading + 0.01) || currentHeading < (targetHeading - 0.01)) &&
+    !(currentHeading < (targetHeading + 0.01) && currentHeading > (targetHeading - 0.01))  
+  );
+  LeftMotors.stop(vex::brake);
+  RightMotors.stop(vex::brake);
+  LeftMotors.setStopping(vex::coast);
+  RightMotors.setStopping(vex::coast);
+  vex::task::sleep(30);
+  currentHeading = Inertial.heading();
+  if(currentHeading < targetHeading - 1 || currentHeading > targetHeading + 1){
+    rotateTo(targetHeading, 5);
+    return;
+  }
+  rotationComplete = true;
 }
 
 void preAuton(){
@@ -150,7 +192,7 @@ void preAuton(){
   Controller.Screen.newLine();
   lateralPID.kP = 0.06;
   lateralPID.kI = 0;
-  lateralPID.kD = 0.005;
+  lateralPID.kD = 0.0055;
 
   rotationPID.kP = 0.4;
   // rotationPID.kI = 0.01;
@@ -220,57 +262,50 @@ void startAutonomous(){
     Intake.spin(vex::reverse, 100, vex::percent);
     LeftMotors.spin(vex::reverse, 100, vex::percent);
     RightMotors.spin(vex::reverse, 100, vex::percent);
-    vex::task::sleep(300);
+    vex::task::sleep(500);
     Intake.stop();
     LeftMotors.stop();
     RightMotors.stop();
-    Encoder.resetRotation();
     autoEngaged = true;
     vex::task drivePIDTask(drivePID);
+    driveTo(-10, 0);
+    waitUntil(movementFinished);
+    drivePIDTask.suspend();
+    // driveTo(0, 89, 100, 100, 0);
+    rotateTo(90);
+    waitUntil(rotationComplete);
+    drivePIDTask.resume();
+    driveTo(11, 0);
+    waitUntil(movementFinished);
+    drivePIDTask.suspend();
+    
+    Intake.spin(vex::reverse, 100, vex::percent);
+    LeftMotors.spin(vex::reverse, 100, vex::percent);
+    RightMotors.spin(vex::reverse, 100, vex::percent);
+    vex::task::sleep(500);
+    Intake.stop();
+    LeftMotors.stop();
+    RightMotors.stop();
+    drivePIDTask.resume();
+    drivePIDTask.resume();
     driveTo(-5, 0);
     waitUntil(movementFinished);
     Flywheel.spin(vex::forward, 12, vex::volt);
-    driveTo(0, 353, 100, 100, 1);
+    drivePIDTask.suspend();
+    rotateTo(97);
     waitUntil(movementFinished);
     vex::task::sleep(750);
     toggleIndexer();
     vex::task::sleep(1500);
     toggleIndexer();
-    vex::task::sleep(50);
-    driveTo(0, 235, 100, 100);
+    vex::task::sleep(500);
     Flywheel.stop();
-    waitUntil(movementFinished);
-    Intake.spin(vex::forward, 100, vex::percent);
-    driveTo(45, 0, 75, 75);
-    waitUntil(movementFinished);
+    rotateTo(225);
+    waitUntil(rotationComplete);
+    expansion();
+    expansion();
   }else if(routine == 2){ // right
-    driveTo(20, 0);
-    waitUntil(movementFinished);
-    driveTo(0, 90, 100, 100, 0);
-    waitUntil(movementFinished);
-    Intake.spin(vex::reverse, 100, vex::percent);
-    LeftMotors.spin(vex::reverse);
-    RightMotors.spin(vex::reverse);
-    vex::task::sleep(300);
-    LeftMotors.stop();
-    RightMotors.stop();
-    Intake.stop();
-    driveTo(-5, 0);
-    waitUntil(movementFinished);
-    Flywheel.spin(vex::forward, 11.5, vex::volt);
-    driveTo(0, 99, 100, 100, 0);
-    waitUntil(movementFinished);
-    vex::task::sleep(750);
-    toggleIndexer();
-    vex::task::sleep(1500);
-    toggleIndexer();
   }else if(routine == 3){ // test
-    driveTo(100, 0);
-    waitUntil(movementFinished);
-    driveTo(0, 180);
-    waitUntil(movementFinished);
-    driveTo(100, 0);
-    waitUntil(movementFinished);
   }
   autoEngaged = false;
 }
